@@ -1,4 +1,5 @@
 import tensorflow as tf
+from matplotlib import pyplot as plt
 import numpy as np
 import sys, os
 
@@ -78,11 +79,13 @@ mcc = tf.keras.callbacks.ModelCheckpoint(
     mode='min',
     save_best_only=True)
 
-csv_logger = tf.keras.callbacks.CSVLogger('teachers_normal_CVPR/teacher_normal_%s_log.csv' % normal_digit, append=True, separator=';')
+csv_logger = tf.keras.callbacks.CSVLogger('teachers_normal_CVPR/teacher_normal_%s_log.csv' % normal_digit,
+    append=True, separator=';')
 es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=11)
 
 ## train
-teacher.fit(train_ds, epochs=500, validation_data = val_ds, callbacks=[es, mcc, csv_logger])
-
-
+history = teacher.fit(train_ds, epochs=100, validation_data=val_ds, callbacks=[es, mcc, csv_logger])
+plt.plot(history.history['loss'][:], label='Training loss')
+plt.plot(history.history['val_loss'][:], label='Validation loss')
+plt.savefig('loss.pdf')
 

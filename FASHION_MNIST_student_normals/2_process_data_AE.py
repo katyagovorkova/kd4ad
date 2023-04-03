@@ -13,7 +13,7 @@ x_test = np.reshape(x_test, (len(x_test), 28, 28, 1))
 x_test = x_test.astype('float32') / 255.
 x_train = x_train.astype('float32') / 255.
 
-anomalous_digit = 8
+anomalous_digit = 0
 batch_size = 100
 teacher = tf.keras.models.load_model('teachers_normal_CVPR/teacher_normal_%s' % anomalous_digit, compile=False)
 print(teacher.summary())
