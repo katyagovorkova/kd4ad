@@ -1,29 +1,23 @@
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 import tensorflow as tf
 import numpy as np
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+
 from students import *
-import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--size", type=int, help="size", required=False)
-parser.add_argument("--digit", type=int, help="digit", required=False)
+import configparser
+config = configparser.ConfigParser()
+config.read('config.ini')
+given_size = config['Params'].getint('student_trainable_params')
+normal_digit = config['Params'].getint('normal_digit')
+log_teacher_output = config['Params'].getboolean('log_teacher_output')
+train_on_anomalies = config['Params'].getboolean('train_on_anomalies')
 
-args, unknown = parser.parse_known_args()
-
-given_size = args.size
-given_digit = args.digit
-
+## USER OPTIONS
+BATCH_SIZE = 1
+lr = 1e-4
 np.random.seed(2)
-
-given_size = 555
-given_digit = 7
-
-all_digits = [0,1,2,3,4,5,6,7,8,9]
-anomalous_digits = np.setdiff1d(all_digits,[given_digit])
-anomalous_digits_f = np.random.choice(anomalous_digits, size=5, replace = False)
-a1, a2, a3, a4, a5 = anomalous_digits_f.ravel()
-print(a1,a2,a3,a4, a5)
+###
 
 (x_train, y_train_orig), (_, _) = tf.keras.datasets.fashion_mnist.load_data()
 
@@ -31,34 +25,39 @@ print(a1,a2,a3,a4, a5)
 x_train = np.reshape(x_train, (len(x_train), 28, 28, 1))
 x_train = x_train.astype('float32') / 255.
 
-## USER OPTIONS
-normal_digit = given_digit
-log = False
-BATCH_SIZE = 1
-lr = 1e-4
-###
-
 ## load saved AE recon errors as targets
 y_train_aed = np.load('AE_outputs/y_train_aed_teacher_normal_CVPR_%s.npy' % normal_digit)
 
 ## log transform of teacher logits
-if log:
-    f = lambda x: np.log(x)
+if log_teacher_output:
+    f = lambda x: np.log(x+1)
     y_train_aed  = f(y_train_aed)
 
 normal_indices = np.where(y_train_orig == normal_digit)[0]
-anom_indices1 = np.where(y_train_orig == a1)[0]
-anom_indices2 = np.where(y_train_orig == a2)[0]
-anom_indices3 = np.where(y_train_orig == a3)[0]
-anom_indices4 = np.where(y_train_orig == a4)[0]
-anom_indices5 = np.where(y_train_orig == a5)[0]
 
-anom_indices = np.concatenate((anom_indices1, anom_indices2, anom_indices3, anom_indices4, anom_indices5)).flatten()
-print(anom_indices.shape)
-## 50/50 normal and anomalous digits for training student
-normals = len(normal_indices)
-np.random.seed(42)
-train_indices = np.append(normal_indices, np.random.choice(anom_indices, size=normals, replace=False))
+if train_on_anomalies==True:
+    all_digits = [0,1,2,3,4,5,6,7,8,9]
+    anomalous_digits = np.setdiff1d(all_digits,[normal_digit])
+    anomalous_digits_f = np.random.choice(anomalous_digits, size=5, replace = False)
+    a1, a2, a3, a4, a5 = anomalous_digits_f.ravel()
+    print(a1,a2,a3,a4, a5)
+
+    anom_indices1 = np.where(y_train_orig == a1)[0]
+    anom_indices2 = np.where(y_train_orig == a2)[0]
+    anom_indices3 = np.where(y_train_orig == a3)[0]
+    anom_indices4 = np.where(y_train_orig == a4)[0]
+    anom_indices5 = np.where(y_train_orig == a5)[0]
+
+    anom_indices = np.concatenate((anom_indices1, anom_indices2, anom_indices3, anom_indices4, anom_indices5)).flatten()
+    print(anom_indices.shape)
+    ## 50/50 normal and anomalous digits for training student
+    normals = len(normal_indices)
+    np.random.seed(42)
+    train_indices = np.append(normal_indices, np.random.choice(anom_indices, size=normals, replace=False))
+
+else:
+    train_indices = normal_indices
+
 
 x_train = x_train[train_indices]
 y_train_aed = y_train_aed[train_indices]
@@ -97,9 +96,7 @@ validation_ds = validation_ds.cache().batch(BATCH_SIZE)
 optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
 student.compile(optimizer = optimizer, loss = tf.keras.losses.MeanAbsoluteError())
 
-savename = 'students_CVPR/student_CVPR_%s_%s' % (size,normal_digit)
-if log:
-    savename = 'students_CVPR/student_CVPR_log_%s_%s' % (size, normal_digit)
+savename =  f"students_CVPR/student_CVPR_{size}_{normal_digit}{'_log' if log_teacher_output else ''}"
 mcc = tf.keras.callbacks.ModelCheckpoint(
     filepath=savename,
     save_weights_only=False,

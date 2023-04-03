@@ -1,13 +1,16 @@
 import tensorflow as tf
+from tensorflow.keras import layers
 from matplotlib import pyplot as plt
 import numpy as np
 import sys, os
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-from tensorflow.keras import layers
+import configparser
+config = configparser.ConfigParser()
+config.read('config.ini')
+normal_digit = config['Params'].getint('normal_digit')
 
 ### USER OPTIONS
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-normal_digit = 0
 lr = 1e-3
 batch_size = 32
 #####

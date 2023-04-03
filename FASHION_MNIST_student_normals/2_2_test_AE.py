@@ -1,15 +1,19 @@
 import sklearn.metrics
 import tensorflow as tf
 import numpy as np
-import os
 import matplotlib.pyplot as plt
 import time
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 from tqdm import tqdm
 from sklearn.metrics import roc_curve, roc_auc_score
 from sklearn import preprocessing
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+import configparser
+config = configparser.ConfigParser()
+config.read('config.ini')
+digit = config['Params'].getint('normal_digit')
 
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
 
@@ -17,8 +21,7 @@ x_test = np.reshape(x_test, (len(x_test), 28, 28, 1))
 x_test = x_test.astype('float32') / 255.
 
 ## USER OPTIONS
-digit = 8
-threshold = 0.23
+threshold = 0.23 # >?????????
 ####
 
 y_test_true = []

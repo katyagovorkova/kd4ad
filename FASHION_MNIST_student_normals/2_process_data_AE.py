@@ -1,9 +1,13 @@
 import tensorflow as tf
 import numpy as np
-import os
 import time
-
+import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+
+import configparser
+config = configparser.ConfigParser()
+config.read('config.ini')
+normal_digit = config['Params'].getint('normal_digit')
 
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
 
@@ -13,12 +17,12 @@ x_test = np.reshape(x_test, (len(x_test), 28, 28, 1))
 x_test = x_test.astype('float32') / 255.
 x_train = x_train.astype('float32') / 255.
 
-anomalous_digit = 0
+normal_digit = 0
 batch_size = 100
-teacher = tf.keras.models.load_model('teachers_normal_CVPR/teacher_normal_%s' % anomalous_digit, compile=False)
+teacher = tf.keras.models.load_model('teachers_normal_CVPR/teacher_normal_%s' % normal_digit, compile=False)
 print(teacher.summary())
 
-print('Processing with teacher digit ', anomalous_digit)
+print('Processing with teacher digit ', normal_digit)
 y_train_aed = []
 i=0
 x_train_len = len(x_train)
@@ -59,7 +63,7 @@ y_test_aed = np.array(y_test_aed).flatten()
 print(len(y_train), len(y_train_aed))
 print(len(y_test), len(y_test_aed))
 print('Average time: ', np.mean(teacher_times))
-np.save('AE_outputs/teacher_normal_CVPR_%s_time' % anomalous_digit, np.mean(teacher_times))
-np.save('AE_outputs/y_train_aed_teacher_normal_CVPR_%s' % anomalous_digit, y_train_aed)
-np.save('AE_outputs/y_test_aed_teacher_normal_CVPR_%s' % anomalous_digit, y_test_aed)
+np.save('AE_outputs/teacher_normal_CVPR_%s_time' % normal_digit, np.mean(teacher_times))
+np.save('AE_outputs/y_train_aed_teacher_normal_CVPR_%s' % normal_digit, y_train_aed)
+np.save('AE_outputs/y_test_aed_teacher_normal_CVPR_%s' % normal_digit, y_test_aed)
 print('DONE')

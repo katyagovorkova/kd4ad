@@ -1,50 +1,58 @@
 import sklearn.metrics
 import tensorflow as tf
 import numpy as np
-import os
 import matplotlib.pyplot as plt
 import time
-
 from tqdm import tqdm
 from sklearn.metrics import roc_curve, roc_auc_score
 from keras_flops import get_flops
 from sklearn import preprocessing
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
-
+import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+import configparser
+config = configparser.ConfigParser()
+config.read('config.ini')
+student_name = config['Params']['student_trainable_params']
+digit = config['Params'].getint('normal_digit')
+train_on_anomalies = config['Params'].getboolean('train_on_anomalies')
+log_teacher_output = config['Params'].getboolean('log_teacher_output')
 
 (_, _), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
 
 x_test = np.reshape(x_test, (len(x_test), 28, 28, 1))
 x_test = x_test.astype('float32') / 255.
 
-## USER OPTIONS
-digit = 1
-student_name = '555'
-####
-
-
 np.random.seed(2)
 
-all_digits = [0,1,2,3,4,5,6,7,8,9]
-anomalous_digits = np.setdiff1d(all_digits,[digit])
-anomalous_digits_training = np.random.choice(anomalous_digits, size=5, replace = False)
-anomalous_digits_testing = np.setdiff1d(anomalous_digits, anomalous_digits_training)
-a1, a2, a3, a4 = anomalous_digits_testing.ravel()
-print(a1,a2,a3,a4)
-
 normal_indices = np.where(y_test == digit)[0]
-anom_indices1 = np.where(y_test == a1 )[0]
-anom_indices2 = np.where(y_test == a2 )[0]
-anom_indices3 = np.where(y_test == a3 )[0]
-anom_indices4 = np.where(y_test == a4 )[0]
 
-anom_indices = np.concatenate((anom_indices1, anom_indices2, anom_indices3, anom_indices4)).flatten()
+# # if config['Params']['train_on_anomalies']==True:
+
+# all_digits = [0,1,2,3,4,5,6,7,8,9]
+# anomalous_digits = np.setdiff1d(all_digits,[digit])
+# # anomalous_digits_training = np.random.choice(anomalous_digits, size=5, replace = False)
+# anomalous_digits_testing = anomalous_digits #np.setdiff1d(anomalous_digits, anomalous_digits_training)
+# a1, a2, a3, a4 = anomalous_digits_testing.ravel()
+# print(a1,a2,a3,a4)
+
+# normal_indices = np.where(y_test == digit)[0]
+# anom_indices1 = np.where(y_test == a1 )[0]
+# anom_indices2 = np.where(y_test == a2 )[0]
+# anom_indices3 = np.where(y_test == a3 )[0]
+# anom_indices4 = np.where(y_test == a4 )[0]
+
+# anom_indices = np.concatenate((anom_indices1, anom_indices2, anom_indices3, anom_indices4)).flatten()
+anom_indices = np.where(y_test != digit)[0]
 
 ## 50/50 normal and anomalous digits for testing
 normals = len(normal_indices)
 np.random.seed(42)
-test_indices = np.append(normal_indices, np.random.choice(anom_indices, size=normals, replace = False))
+test_indices = np.append(normal_indices, np.random.choice(anom_indices, size=normals, replace=False))
+# else:
+#     test_indices = normal_indices
+
 x_test = x_test[test_indices]
 y_test = y_test[test_indices]
 
@@ -55,8 +63,8 @@ for i in tqdm(y_test):
     else:
         y_test_true.append(1)
 
-teacher = tf.keras.models.load_model('teachers_normal_CVPR/teacher_normal_%s' % digit, compile=False)
-student = tf.keras.models.load_model('students_CVPR/student_CVPR_%s_%s' % (student_name, digit), compile=False)
+teacher = tf.keras.models.load_model(f'teachers_normal_CVPR/teacher_normal_{digit}', compile=False)
+student = tf.keras.models.load_model(f"students_CVPR/student_CVPR_{student_name}_{digit}{'_log' if log_teacher_output else ''}", compile=False)
 teacher_params = np.sum([np.prod(v.get_shape()) for v in teacher.trainable_weights])
 
 teacher_flops = get_flops(teacher, batch_size=1)/ 10 ** 3
@@ -76,8 +84,8 @@ print('Student parameters: ', student_params)
 
 y_train_aed_for_scaler = np.load('AE_outputs/y_train_aed_teacher_normal_CVPR_%s.npy' % digit)
 y_test_aed = np.load('AE_outputs/y_test_aed_teacher_normal_CVPR_%s.npy' % digit)
-if 'log' in student_name:
-    f = lambda x: np.log(x)
+if log_teacher_output:
+    f = lambda x: np.log(x+1)
     y_test_aed = f(np.load('AE_outputs/y_test_aed_teacher_normal_CVPR_%s.npy' % digit))
 
 y_test_aed = y_test_aed[test_indices]
@@ -107,7 +115,7 @@ for teacher_pred, student_pred, true in zip(y_test_aed, student_preds, y_test_tr
 fs = 18
 maximum = max(max(teacher_anom), max(student_anom), max(teacher_norm), max(student_norm))
 bins = np.arange(0,maximum, maximum/50)
-if 'log' in student_name:
+if log_teacher_output:
     bins = 50
 fig = plt.figure()
 ax = fig.add_subplot(121)
